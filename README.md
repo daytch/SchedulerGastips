@@ -1,2 +1,0 @@
-# SchedulerGastips
-Gastips Scheduler
