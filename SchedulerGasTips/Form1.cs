@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Configuration;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -57,18 +58,13 @@ namespace SchedulerGasTips
                     List<string> listHrefBranch = new List<string>();
                     foreach (HtmlNode linkBranch in docJson.DocumentNode.SelectNodes("//a[@href]"))
                     {
-                        try
+                        HtmlAttribute attBranch = linkBranch.Attributes["href"];
+                        if (attBranch != null)
                         {
-                            HtmlAttribute attBranch = linkBranch.Attributes["href"];
-                            Console.WriteLine("Line 61 = " + attBranch);
-                            if (attBranch.Value.Contains("GasPrices"))
+                            if (attBranch.Value.Contains("GasPrices") && !listHrefBranch.Any(x=>x==attBranch.Value))
                             {
                                 listHrefBranch.Add(attBranch.Value);
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            throw ex;
                         }
                     }
                     for (int j = 0; j < listHrefBranch.Count; j++)
@@ -78,16 +74,22 @@ namespace SchedulerGasTips
                             HtmlWeb hwDetail = new HtmlWeb();
                             HtmlAgilityPack.HtmlDocument docDetail = hwDetail.Load(url + listHrefBranch[j]);
                             List<string> listHrefDetail = new List<string>();
-                            foreach (HtmlNode linkDetail in docDetail.DocumentNode.SelectNodes("//a[@href]"))
+                            if (docDetail.DocumentNode != null)
                             {
                                 try
                                 {
-                                    HtmlAttribute attDetail = linkDetail.Attributes["href"];
-                                    Console.WriteLine("Line 76 = " + attDetail.Value);
-                                    if (attDetail.Value.Contains("GasPrices") && attDetail.Value != "/GasPrices/" &&
-                                        attDetail.Value != "/GasPrices")
+                                    var selectNode = docDetail.DocumentNode.SelectNodes("//a[@href]");
+                                    if (selectNode != null)
                                     {
-                                        ListUrl.Add(url + attDetail.Value);
+                                        foreach (HtmlNode linkDetail in docDetail.DocumentNode.SelectNodes("//a[@href]"))
+                                        {
+                                            HtmlAttribute attDetail = linkDetail.Attributes["href"];
+                                            if (attDetail.Value.Contains("GasPrices") && attDetail.Value != "/GasPrices/" &&
+                                                attDetail.Value != "/GasPrices" && !ListUrl.Any(x => x == (url + attDetail.Value)))
+                                            {
+                                                ListUrl.Add(url + attDetail.Value);
+                                            }
+                                        }
                                     }
                                 }
                                 catch (Exception ex)
@@ -115,9 +117,12 @@ namespace SchedulerGasTips
                 foreach (HtmlNode linkBranch in docBranch.DocumentNode.SelectNodes("//a[@href]"))
                 {
                     HtmlAttribute attBranch = linkBranch.Attributes["href"];
-                    if (attBranch.Value.Contains("GasPrices"))
+                    if (attBranch != null)
                     {
-                        listHrefBranch.Add(url + attBranch.Value);
+                        if (attBranch.Value.Contains("GasPrices") && !listHrefBranch.Any(x=>x==(url + attBranch.Value)))
+                        {
+                            listHrefBranch.Add(url + attBranch.Value);
+                        }
                     }
                 }
                 ListDetail = MappingData(listHrefBranch, listCity);
@@ -128,6 +133,7 @@ namespace SchedulerGasTips
         private List<String> GetAllUrl()
         {
             List<string> listUrl = new List<string>();
+
             #region Gather Url from gasbuddy.com
             for (int i = 0; i < MainUrl.Length; i++)
             {
@@ -138,9 +144,12 @@ namespace SchedulerGasTips
                 foreach (HtmlNode link in doc.DocumentNode.SelectNodes("//a[@href]"))
                 {
                     HtmlAttribute att = link.Attributes["href"];
-                    if (att.Value.Contains("GasPrices"))
+                    if (att != null)
                     {
-                        listHrefCity.Add(url + att.Value);
+                        if (att.Value.Contains("GasPrices") && !listHrefCity.Any(x=>x==(url+att.Value)))
+                        {
+                            listHrefCity.Add(url + att.Value);
+                        }
                     }
                 }
                 GetCityLinks(listHrefCity);
@@ -168,6 +177,7 @@ namespace SchedulerGasTips
             }
             JsonString = JsonString.Remove(0, 24);
             JsonString = JsonString.Remove(JsonString.Length - 1);
+
             #region Set Station info
             XmlDocument xmlDoc = (XmlDocument)JsonConvert.DeserializeXmlNode(JsonString, "root");
             XmlNodeList nodeListInfo = xmlDoc.DocumentElement.SelectNodes("/root/stationInfo");
@@ -234,12 +244,20 @@ namespace SchedulerGasTips
                 }
             }
             #endregion
+
             return data;
         }
 
         private async void Form1_Load(object sender, EventArgs e)
         {
-            var data = await GetData();
+            try
+            {
+                var data = await GetData();
+            }
+            catch (NullReferenceException ex)
+            {
+                Debug.WriteLine(ex);
+            }
         }
     }
 }
