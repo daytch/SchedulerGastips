@@ -13,6 +13,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
+using OfficeOpenXml;
+using OfficeOpenXml.Style;
+using System.IO;
 
 namespace SchedulerGasTips
 {
@@ -40,7 +43,6 @@ namespace SchedulerGasTips
     {
         static string url = "https://www.gasbuddy.com";
         static string[] MainUrl = ConfigurationManager.AppSettings["MainUrl"].Split(',');
-        private bool processing = false;
 
         public FormMain()
         {
@@ -110,7 +112,7 @@ namespace SchedulerGasTips
                 this.txtLog.AppendText("\r\n");
             }
         }
-        
+
         private void InternalStartProcess()
         {
             ThreadStart ts = new ThreadStart(InternalStartThreadProccess);
@@ -126,7 +128,54 @@ namespace SchedulerGasTips
             {
                 processing = true;
                 this.InternalWriteLog("Starting (from background thread)...");
-                var data = await GetData();
+                List<NameAndProp> data = await GetData();
+                FileInfo newFile = new FileInfo(@"D:\Users\xssnurul1396\Documents\GasTips.xlsx");
+
+                if (newFile.Exists)
+                {
+                    newFile.Delete();  // ensures we create a new workbook
+                    newFile = new FileInfo(@"C:D:\Users\xssnurul1396\Documents\GasTips.xlsx");
+                }
+                using (ExcelPackage ep = new ExcelPackage(newFile))
+                {
+                    ExcelWorksheet sheet1 = ep.Workbook.Worksheets.Add("Sheet1");
+                    sheet1.Cells["A1"].Value = "No";
+                    sheet1.Cells["B1"].Value = "Nama";
+                    sheet1.Cells["C1"].Value = "Brand ID";
+                    sheet1.Cells["D1"].Value = "Address";
+                    sheet1.Cells["E1"].Value = "Locality";
+                    sheet1.Cells["F1"].Value = "Region";
+                    sheet1.Cells["G1"].Value = "Country";
+                    sheet1.Cells["H1"].Value = "Postal Code";
+                    sheet1.Cells["I1"].Value = "TimeZone";
+                    sheet1.Cells["J1"].Value = "Phone";
+                    sheet1.Cells["K1"].Value = "Reguler";
+                    sheet1.Cells["L1"].Value = "Premium";
+                    sheet1.Cells["M1"].Value = "Diesel";
+                    sheet1.Cells["N1"].Value = "Feature";
+                    sheet1.Cells["O1"].Value = "Latitude";
+                    sheet1.Cells["P1"].Value = "Logitude";
+                    int x = 2;
+                    for (int i = 0; i < data.Count; i++)
+                    {
+                        sheet1.Cells["A" + x].Value = i + 1;
+                        sheet1.Cells["B" + x].Value = data[i].Name;
+                        sheet1.Cells["C" + x].Value = data[i].Brand_id;
+                        sheet1.Cells["D" + x].Value = data[i].Address;
+                        sheet1.Cells["E" + x].Value = data[i].Locality;
+                        sheet1.Cells["F" + x].Value = data[i].Region;
+                        sheet1.Cells["G" + x].Value = data[i].Country;
+                        sheet1.Cells["H" + x].Value = data[i].Postal_code;
+                        sheet1.Cells["I" + x].Value = data[i].Timezone;
+                        sheet1.Cells["J" + x].Value = data[i].Phone;
+                        sheet1.Cells["K" + x].Value = data[i].Regular_price;
+                        sheet1.Cells["L" + x].Value = data[i].Premium_price;
+                        sheet1.Cells["M" + x].Value = data[i].Diesel_price;
+                        sheet1.Cells["N" + x].Value = data[i].Features;
+                        sheet1.Cells["O" + x].Value = data[i].Latitude;
+                        sheet1.Cells["P" + x].Value = data[i].Longitude;
+                    }
+                }
             }
             catch (NullReferenceException ex)
             {
@@ -136,116 +185,122 @@ namespace SchedulerGasTips
             this.InternalWriteLog("Stopped.");
         }
 
-        private List<string> MappingData(List<string> listBranch, List<string> listDouble)
+        private List<string> GetMajorAndCountryLink(List<string> listCity)
         {
-            List<string> ListDetailStation = new List<string>();
-            List<string> ListUrl = new List<string>();
-            this.InternalWriteLog("Mapping data...");
-
-            listBranch = listBranch.Distinct().ToList();
-            listDouble = listDouble.Distinct().ToList();
-
-            for (int i = 0; i < listBranch.Count; i++)
-            {
-                if (listBranch[i] != "https://www.gasbuddy.com/GasPrices" && listBranch[i] != "https://www.gasbuddy.com/GasPrices/")
-                {
-                    this.InternalWriteLog("Mapping data: " + listBranch[i]);
-                    HtmlWeb hwJson = new HtmlWeb();
-                    HtmlAgilityPack.HtmlDocument docJson = hwJson.Load(listBranch[i]);
-                    List<string> listHrefBranch = new List<string>();
-                    foreach (HtmlNode linkBranch in docJson.DocumentNode.SelectNodes("//a[@href]"))
-                    {
-                        HtmlAttribute attBranch = linkBranch.Attributes["href"];
-                        //this.InternalWriteLog("Parsing branch data: " + linkBranch.Attributes["href"]);
-                        if (attBranch != null)
-                        {
-                            if (attBranch.Value.Contains("GasPrices") && !listHrefBranch.Any(x => x == attBranch.Value))
-                            {
-                                listHrefBranch.Add(attBranch.Value);
-                            }
-                        }
-                        //this.InternalWriteLog("Done parsing branch data: " + linkBranch.Attributes["href"]);
-                    }
-                    for (int j = 0; j < listHrefBranch.Count; j++)
-                    {
-                        this.InternalWriteLog("Checking & parsing data: " + listHrefBranch[j]);
-                        if (listHrefBranch[j] != "https://www.gasbuddy.com/GasPrices" && listHrefBranch[j] != "https://www.gasbuddy.com/GasPrices/")
-                        {
-                            HtmlWeb hwDetail = new HtmlWeb();
-                            HtmlAgilityPack.HtmlDocument docDetail = hwDetail.Load(url + listHrefBranch[j]);
-                            List<string> listHrefDetail = new List<string>();
-                            if (docDetail.DocumentNode != null)
-                            {
-                                try
-                                {
-                                    var selectNode = docDetail.DocumentNode.SelectNodes("//a[@href]");
-                                    if (selectNode != null)
-                                    {
-                                        foreach (HtmlNode linkDetail in docDetail.DocumentNode.SelectNodes("//a[@href]"))
-                                        {
-                                            HtmlAttribute attDetail = linkDetail.Attributes["href"];
-                                            if (attDetail.Value.Contains("GasPrices") && attDetail.Value != "/GasPrices/" &&
-                                                attDetail.Value != "/GasPrices" && !ListUrl.Any(x => x == (url + attDetail.Value)))
-                                            {
-                                                ListUrl.Add(url + attDetail.Value);
-                                            }
-                                        }
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    throw ex;
-                                }
-                            }
-                        }
-                        this.InternalWriteLog("Done checking & parsing data: " + listHrefBranch[j]);
-                        if (!processing)
-                        {
-                            break;
-                        }
-                    }
-                    this.InternalWriteLog("Done mapping data: " + listBranch[i]);
-                    if (!processing)
-                    {
-                        break;
-                    }
-                }
-                if (!processing)
-                {
-                    break;
-                }
-            }
-            ListUrl = ListUrl.Distinct().ToList();
-            ListDetailStation = ListUrl.Except(listDouble).ToList();
-            this.InternalWriteLog("Done mapping data...");
-            return ListDetailStation;
-        }
-
-        private void GetMajorAndCountryLink(List<string> listCity)
-        {
+            #region Initiate List
             List<string> ListStation = new List<string>();
-            List<string> ListAllStation = new List<string>();
-            List<string> ListDetail = new List<string>();
-            this.InternalWriteLog("Loading cities: " + listCity.Count.ToString());
-            
-            for (int i = 0; i < listCity.Count; i++)
-            {
-                HtmlWeb hwBranch = new HtmlWeb();
-                HtmlAgilityPack.HtmlDocument docBranch = hwBranch.Load(listCity[i]);
-                List<string> listHrefBranch = new List<string>();
-                this.InternalWriteLog("Loading city data: " + listCity[i]);
-                foreach (HtmlNode StationLinks in docBranch.DocumentNode.SelectNodes("//text()[contains(., 'Top 10')]/ancestor::div[4]"))
-                {
-                    HtmlAttribute attStation = StationLinks.Attributes["href"];
-                    //this.InternalWriteLog("Loading branch data: " + linkBranch.Attributes["href"]);
+            List<string> ListMajor = new List<string>();
+            List<string> ListLocal = new List<string>();
+            //listCity.Add("https://www.gasbuddy.com/GasPrices/NewBrunswick");
+            #endregion
+            this.InternalWriteLog("Loading Country : " + listCity.Count.ToString());
 
-                    if (attStation != null)
+            for (int i = 0; i < 2;i++) //listCity.Count; i++)
+            {
+                #region loop
+                HtmlWeb hwBranch = new HtmlWeb();
+                HtmlAgilityPack.HtmlDocument docBranch = hwBranch.Load("https://www.gasbuddy.com/GasPrices/PEI");//(listCity[i]);
+                List<string> listHrefBranch = new List<string>();
+                this.InternalWriteLog("Loading Country data: " + listCity[i]);
+
+                #region Get Station's Link
+                if (docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a") == null)
+                {
+                    foreach (HtmlNode StationLinks in docBranch.DocumentNode.SelectNodes("//*[@id='prices - table']/tr/td/a"))
                     {
-                        if (attStation.Value.Contains("GasPrices"))
+                        HtmlAttribute attStation = StationLinks.Attributes["href"];
+                        //this.InternalWriteLog("Loading branch data: " + linkBranch.Attributes["href"]);
+
+                        if (attStation != null)
                         {
-                            ListStation.Add(url + attStation.Value);
+                            if (attStation.Value.Contains("Station"))
+                            {
+                                ListStation.Add(url + attStation.Value);
+                            }
+                        }
+                        else
+                        {
+                            //log
                         }
                     }
+                }
+                else
+                {
+                    foreach (HtmlNode StationLinks in docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a"))
+                    {
+                        HtmlAttribute attStation = StationLinks.Attributes["href"];
+                        //this.InternalWriteLog("Loading branch data: " + linkBranch.Attributes["href"]);
+
+                        if (attStation != null)
+                        {
+                            if (attStation.Value.Contains("Station"))
+                            {
+                                ListStation.Add(url + attStation.Value);
+                            }
+                        }
+                        else
+                        {
+                            //log
+                        }
+                    }
+                }
+                #endregion
+
+                #region Get Major Areas
+                if (docBranch.DocumentNode.SelectNodes("//div[@id='suggestions']/div/a") != null)
+                {
+                    foreach (HtmlNode MajorLinks in docBranch.DocumentNode.SelectNodes("//div[@id='suggestions']/div/a"))
+                    {
+                        HtmlAttribute attMajor = MajorLinks.Attributes["href"];
+                        //this.InternalWriteLog("Loading branch data: " + linkBranch.Attributes["href"]);
+
+                        if (attMajor != null)
+                        {
+                            if (attMajor.Value.Contains("GasPrices"))
+                            {
+                                ListMajor.Add(url + attMajor.Value);
+                            }
+                        }
+                        else
+                        {
+                            //log
+                        }
+                    }
+                }
+                #endregion
+
+                #region Get Local / Country Prices
+                if (docBranch.DocumentNode.SelectNodes("/html/body/div[3]/div/div[1]/div[3]/div/div/div/div/a") != null)
+                {
+                    foreach (HtmlNode LocalLinks in docBranch.DocumentNode.SelectNodes("/html/body/div[3]/div/div[1]/div[3]/div/div/div/div/a"))
+                    {
+                        HtmlAttribute attLocal = LocalLinks.Attributes["href"];
+                        //this.InternalWriteLog("Loading branch data: " + linkBranch.Attributes["href"]);
+
+                        if (attLocal != null)
+                        {
+                            if (attLocal.Value.Contains("GasPrices"))
+                            {
+                                ListLocal.Add(url + attLocal.Value);
+                            }
+                        }
+                        else
+                        {
+                            //log
+                        }
+                    }
+                }
+                #endregion
+
+                if (ListMajor.Count > 0)
+                {
+                    List<string> ListFromMajor = GetDataFromMajor(ListMajor.Distinct().ToList());
+                    ListStation.AddRange(ListFromMajor);
+                }
+                if (ListLocal.Count > 0)
+                {
+                    List<string> ListFromLocal = GetDataFromLocal(ListLocal.Distinct().ToList());
+                    ListStation.AddRange(ListFromLocal);
                 }
 
                 #region 30/01/2018
@@ -264,12 +319,132 @@ namespace SchedulerGasTips
 
                 //    //this.InternalWriteLog("Done loading branch data: " + linkBranch.Attributes["href"]);
                 //}
+                //listHrefBranch = listHrefBranch.Distinct().ToList();
+                //ListDetail = MappingData(listHrefBranch, listCity);
+                //ListAllStation.AddRange(ListDetail);
                 #endregion
-                listHrefBranch = listHrefBranch.Distinct().ToList();
-                ListDetail = MappingData(listHrefBranch, listCity);
-                ListAllStation.AddRange(ListDetail);
-                this.InternalWriteLog("Done loading city data: " + listCity[i]);
+                this.InternalWriteLog("Done loading Country data: " + listCity[i]);
+                #endregion
             }
+            return ListStation.Distinct().ToList();
+        }
+
+        private List<string> GetDataFromMajor(List<string> ListMajor)
+        {
+            List<string> ListStation = new List<string>();
+            List<string> ListLocal = new List<string>();
+            for (int i = 0; i < ListMajor.Count; i++)
+            {
+                HtmlWeb hwMajor = new HtmlWeb();
+                HtmlAgilityPack.HtmlDocument docBranch = hwMajor.Load(ListMajor[i]);
+                this.InternalWriteLog("Loading Major data (Sub Method): " + ListMajor[i]);
+
+                #region Get Station's Link
+                if (docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a") != null)
+                {
+                    foreach (HtmlNode StationLinks in docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a"))
+                    {
+                        this.InternalWriteLog("Get Station link data: " + ListMajor[i]);
+                        HtmlAttribute attStation = StationLinks.Attributes["href"];
+                        if (attStation != null)
+                        {
+                            if (attStation.Value.Contains("Station"))
+                            {
+                                this.InternalWriteLog("Insert :" + attStation.Value + " to List Station");
+                                ListStation.Add(url + attStation.Value);
+                            }
+                        }
+                        else
+                        {
+                            //log
+                        }
+                    }
+                }
+                #endregion
+
+                #region Get Local / Country Prices
+                if (docBranch.DocumentNode.SelectNodes("/html/body/div[3]/div/div[1]/div[3]/div/div/div/div/a") == null)
+                {
+                    foreach (HtmlNode LocalLinks in docBranch.DocumentNode.SelectNodes("//*[@id='suggestions']/div[1]/a"))
+                    {
+                        this.InternalWriteLog("Get Local link data (Sub 1 Method)");
+                        HtmlAttribute attLocal = LocalLinks.Attributes["href"];
+                        if (attLocal != null)
+                        {
+                            if (attLocal.Value.Contains("GasPrices"))
+                            {
+                                ListLocal.Add(url + attLocal.Value);
+                            }
+                        }
+                        else
+                        {
+                            //log
+                        }
+                    }
+                    this.InternalWriteLog("Done Get Local link data (Sub 1 Method)");
+                }
+                else
+                {
+                    foreach (HtmlNode LocalLinks in docBranch.DocumentNode.SelectNodes("/html/body/div[3]/div/div[1]/div[3]/div/div/div/div/a"))
+                    {
+                        this.InternalWriteLog("Get Local link data (Sub 1 Method)");
+                        HtmlAttribute attLocal = LocalLinks.Attributes["href"];
+                        if (attLocal != null)
+                        {
+                            if (attLocal.Value.Contains("GasPrices"))
+                            {
+                                ListLocal.Add(url + attLocal.Value);
+                            }
+                        }
+                        else
+                        {
+                            //log
+                        }
+                    }
+                    this.InternalWriteLog("Done Get Local link data (Sub 1 Method)");
+                }
+                #endregion
+
+                if (ListLocal.Count > 0)
+                {
+                    List<string> listLoc = GetDataFromLocal(ListLocal.Distinct().ToList());
+                    ListStation.AddRange(listLoc);
+                }
+            }
+            return ListStation.Distinct().ToList();
+        }
+
+        private List<string> GetDataFromLocal(List<string> ListLocal)
+        {
+            List<string> ListStation = new List<string>();
+            for (int i = 0; i < ListLocal.Count; i++)
+            {
+                HtmlWeb hwMajor = new HtmlWeb();
+                HtmlAgilityPack.HtmlDocument docBranch = hwMajor.Load(ListLocal[i]);
+                this.InternalWriteLog("Loading Local data (Sub 2 Method): " + ListLocal[i]);
+
+                #region Get Station's Link
+                if (docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a") != null)
+                {
+                    foreach (HtmlNode StationLinks in docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a"))
+                    {
+                        HtmlAttribute attStation = StationLinks.Attributes["href"];
+                        if (attStation != null)
+                        {
+                            if (attStation.Value.Contains("Station"))
+                            {
+                                ListStation.Add(url + attStation.Value);
+                            }
+                        }
+                        else
+                        {
+                            //log
+                        }
+                    }
+                }
+                #endregion
+            }
+            return ListStation;
         }
 
         private List<String> GetAllState()
@@ -281,6 +456,7 @@ namespace SchedulerGasTips
                 ListMain.Add(url + "/GasPrices/" + item);
             }
 
+            List<string> listHrefCity = new List<string>();
             #region Gather Url from gasbuddy.com
             for (int i = 0; i < ListMain.Count; i++)
             {
@@ -288,14 +464,11 @@ namespace SchedulerGasTips
                 //get url from country
                 HtmlWeb hw = new HtmlWeb();
                 HtmlAgilityPack.HtmlDocument doc = hw.Load(ListMain[i]);
-                List<string> listHrefCity = new List<string>();
 
                 this.InternalWriteLog("Loading data from: " + url + "/GasPrices");
 
-                foreach (HtmlNode link in doc.DocumentNode.SelectNodes("//a[@href]")) //("//div[@class='white-box']"))
+                foreach (HtmlNode link in doc.DocumentNode.SelectNodes("//a[@href]"))
                 {
-                    //this.InternalWriteLog("Parsing data from: " + link.Attributes["href"]);
-
                     HtmlAttribute att = link.Attributes["href"];
                     if (att != null)
                     {
@@ -308,9 +481,10 @@ namespace SchedulerGasTips
                 }
 
                 this.InternalWriteLog("Done loading data from: " + ListMain[i]);
-                listHrefCity.RemoveAt(0);
-                GetMajorAndCountryLink(listHrefCity);
+                listHrefCity.Remove("https://www.gasbuddy.com/GasPrices");
             }
+            List<string> ListStation = GetMajorAndCountryLink(listHrefCity);
+            listUrl.AddRange(ListStation);
             #endregion
 
             return listUrl;
@@ -410,7 +584,8 @@ namespace SchedulerGasTips
             this.InternalWriteLog("Begin crawling process...");
             List<NameAndProp> ListData = new List<NameAndProp>();
             NameAndProp data = new NameAndProp();
-            List<string> listUrl = GetAllState();
+            //List<string> a = new List<string>();
+            List<string> listUrl = GetAllState();//GetAllState(); GetMajorAndCountryLink(a);
             foreach (var item in listUrl)
             {
                 ListData.AddRange(GetLowestPrices(item));

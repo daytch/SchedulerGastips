@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SchedulerGasTips", "SchedulerGasTips\SchedulerGasTips.csproj", "{0D83C286-E3B1-4AB0-99B6-0EAB3F14754A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Model", "Model\Model.csproj", "{A259FB4E-1A13-484A-9008-1088E2A78E8C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{0D83C286-E3B1-4AB0-99B6-0EAB3F14754A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0D83C286-E3B1-4AB0-99B6-0EAB3F14754A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0D83C286-E3B1-4AB0-99B6-0EAB3F14754A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A259FB4E-1A13-484A-9008-1088E2A78E8C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A259FB4E-1A13-484A-9008-1088E2A78E8C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A259FB4E-1A13-484A-9008-1088E2A78E8C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A259FB4E-1A13-484A-9008-1088E2A78E8C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
