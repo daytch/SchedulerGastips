@@ -37,12 +37,14 @@ namespace SchedulerGasTips
         public string Features { get; set; }
         public string Latitude { get; set; }
         public string Longitude { get; set; }
+        public string Url { get; set; }
     }
 
     public partial class FormMain : Form
     {
         static string url = "https://www.gasbuddy.com";
         static string[] MainUrl = ConfigurationManager.AppSettings["MainUrl"].Split(',');
+        private bool processing = false;
 
         public FormMain()
         {
@@ -129,14 +131,8 @@ namespace SchedulerGasTips
                 processing = true;
                 this.InternalWriteLog("Starting (from background thread)...");
                 List<NameAndProp> data = await GetData();
-                FileInfo newFile = new FileInfo(@"D:\Users\xssnurul1396\Documents\GasTips.xlsx");
 
-                if (newFile.Exists)
-                {
-                    newFile.Delete();  // ensures we create a new workbook
-                    newFile = new FileInfo(@"C:D:\Users\xssnurul1396\Documents\GasTips.xlsx");
-                }
-                using (ExcelPackage ep = new ExcelPackage(newFile))
+                using (ExcelPackage ep = new ExcelPackage())
                 {
                     ExcelWorksheet sheet1 = ep.Workbook.Worksheets.Add("Sheet1");
                     sheet1.Cells["A1"].Value = "No";
@@ -155,26 +151,35 @@ namespace SchedulerGasTips
                     sheet1.Cells["N1"].Value = "Feature";
                     sheet1.Cells["O1"].Value = "Latitude";
                     sheet1.Cells["P1"].Value = "Logitude";
+                    sheet1.Cells["Q1"].Value = "Url";
                     int x = 2;
+                    int z = 0;
+                    #region Mapping Brand in Cell
                     for (int i = 0; i < data.Count; i++)
                     {
-                        sheet1.Cells["A" + x].Value = i + 1;
-                        sheet1.Cells["B" + x].Value = data[i].Name;
-                        sheet1.Cells["C" + x].Value = data[i].Brand_id;
-                        sheet1.Cells["D" + x].Value = data[i].Address;
-                        sheet1.Cells["E" + x].Value = data[i].Locality;
-                        sheet1.Cells["F" + x].Value = data[i].Region;
-                        sheet1.Cells["G" + x].Value = data[i].Country;
-                        sheet1.Cells["H" + x].Value = data[i].Postal_code;
-                        sheet1.Cells["I" + x].Value = data[i].Timezone;
-                        sheet1.Cells["J" + x].Value = data[i].Phone;
-                        sheet1.Cells["K" + x].Value = data[i].Regular_price;
-                        sheet1.Cells["L" + x].Value = data[i].Premium_price;
-                        sheet1.Cells["M" + x].Value = data[i].Diesel_price;
-                        sheet1.Cells["N" + x].Value = data[i].Features;
-                        sheet1.Cells["O" + x].Value = data[i].Latitude;
-                        sheet1.Cells["P" + x].Value = data[i].Longitude;
+                        z = x + i;
+                        this.InternalWriteLog("Start Mapping brand :" + data[i].Name);
+                        sheet1.Cells["A" + z].Value = i + 1;
+                        sheet1.Cells["B" + z].Value = data[i].Name;
+                        sheet1.Cells["C" + z].Value = data[i].Brand_id;
+                        sheet1.Cells["D" + z].Value = data[i].Address;
+                        sheet1.Cells["E" + z].Value = data[i].Locality;
+                        sheet1.Cells["F" + z].Value = data[i].Region;
+                        sheet1.Cells["G" + z].Value = data[i].Country;
+                        sheet1.Cells["H" + z].Value = data[i].Postal_code;
+                        sheet1.Cells["I" + z].Value = data[i].Timezone;
+                        sheet1.Cells["J" + z].Value = data[i].Phone;
+                        sheet1.Cells["K" + z].Value = data[i].Regular_price;
+                        sheet1.Cells["L" + z].Value = data[i].Premium_price;
+                        sheet1.Cells["M" + z].Value = data[i].Diesel_price;
+                        sheet1.Cells["N" + z].Value = data[i].Features;
+                        sheet1.Cells["O" + z].Value = data[i].Latitude;
+                        sheet1.Cells["P" + z].Value = data[i].Longitude;
+                        sheet1.Cells["Q" + z].Value = data[i].Url;
+                        this.InternalWriteLog("End Mapping brand :" + data[i].Name);
                     }
+                    #endregion
+                    ep.SaveAs(new FileInfo(@"D:\Users\xssnurul1396\Documents\GasTips.xlsx"));
                 }
             }
             catch (NullReferenceException ex)
@@ -195,16 +200,16 @@ namespace SchedulerGasTips
             #endregion
             this.InternalWriteLog("Loading Country : " + listCity.Count.ToString());
 
-            for (int i = 0; i < 2;i++) //listCity.Count; i++)
+            for (int i = 0; i < listCity.Count; i++)
             {
                 #region loop
                 HtmlWeb hwBranch = new HtmlWeb();
-                HtmlAgilityPack.HtmlDocument docBranch = hwBranch.Load("https://www.gasbuddy.com/GasPrices/PEI");//(listCity[i]);
+                HtmlAgilityPack.HtmlDocument docBranch = hwBranch.Load(listCity[i]);
                 List<string> listHrefBranch = new List<string>();
                 this.InternalWriteLog("Loading Country data: " + listCity[i]);
 
                 #region Get Station's Link
-                if (docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a") == null)
+                if (docBranch.DocumentNode.SelectNodes("//*[@id='prices - table']/tr/td/a") != null)
                 {
                     foreach (HtmlNode StationLinks in docBranch.DocumentNode.SelectNodes("//*[@id='prices - table']/tr/td/a"))
                     {
@@ -224,7 +229,7 @@ namespace SchedulerGasTips
                         }
                     }
                 }
-                else
+                else if (docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a") != null)
                 {
                     foreach (HtmlNode StationLinks in docBranch.DocumentNode.SelectNodes("//tbody/tr/td/a"))
                     {
@@ -292,17 +297,6 @@ namespace SchedulerGasTips
                 }
                 #endregion
 
-                if (ListMajor.Count > 0)
-                {
-                    List<string> ListFromMajor = GetDataFromMajor(ListMajor.Distinct().ToList());
-                    ListStation.AddRange(ListFromMajor);
-                }
-                if (ListLocal.Count > 0)
-                {
-                    List<string> ListFromLocal = GetDataFromLocal(ListLocal.Distinct().ToList());
-                    ListStation.AddRange(ListFromLocal);
-                }
-
                 #region 30/01/2018
                 //foreach (HtmlNode linkBranch in docBranch.DocumentNode.SelectNodes("//a[@href]"))
                 //{
@@ -323,8 +317,18 @@ namespace SchedulerGasTips
                 //ListDetail = MappingData(listHrefBranch, listCity);
                 //ListAllStation.AddRange(ListDetail);
                 #endregion
-                this.InternalWriteLog("Done loading Country data: " + listCity[i]);
                 #endregion
+                this.InternalWriteLog("Done loading Country data: " + listCity[i]);
+            }
+            if (ListMajor.Count > 0)
+            {
+                List<string> ListFromMajor = GetDataFromMajor(ListMajor.Distinct().ToList());
+                ListStation.AddRange(ListFromMajor);
+            }
+            if (ListLocal.Count > 0)
+            {
+                List<string> ListFromLocal = GetDataFromLocal(ListLocal.Distinct().ToList());
+                ListStation.AddRange(ListFromLocal);
             }
             return ListStation.Distinct().ToList();
         }
@@ -363,7 +367,7 @@ namespace SchedulerGasTips
                 #endregion
 
                 #region Get Local / Country Prices
-                if (docBranch.DocumentNode.SelectNodes("/html/body/div[3]/div/div[1]/div[3]/div/div/div/div/a") == null)
+                if (docBranch.DocumentNode.SelectNodes("//*[@id='suggestions']/div[1]/a") != null)
                 {
                     foreach (HtmlNode LocalLinks in docBranch.DocumentNode.SelectNodes("//*[@id='suggestions']/div[1]/a"))
                     {
@@ -383,7 +387,7 @@ namespace SchedulerGasTips
                     }
                     this.InternalWriteLog("Done Get Local link data (Sub 1 Method)");
                 }
-                else
+                else if (docBranch.DocumentNode.SelectNodes("/html/body/div[3]/div/div[1]/div[3]/div/div/div/div/a") != null)
                 {
                     foreach (HtmlNode LocalLinks in docBranch.DocumentNode.SelectNodes("/html/body/div[3]/div/div[1]/div[3]/div/div/div/div/a"))
                     {
@@ -405,11 +409,11 @@ namespace SchedulerGasTips
                 }
                 #endregion
 
-                if (ListLocal.Count > 0)
-                {
-                    List<string> listLoc = GetDataFromLocal(ListLocal.Distinct().ToList());
-                    ListStation.AddRange(listLoc);
-                }
+            }
+            if (ListLocal.Count > 0)
+            {
+                List<string> listLoc = GetDataFromLocal(ListLocal.Distinct().ToList());
+                ListStation.AddRange(listLoc);
             }
             return ListStation.Distinct().ToList();
         }
@@ -483,6 +487,7 @@ namespace SchedulerGasTips
                 this.InternalWriteLog("Done loading data from: " + ListMain[i]);
                 listHrefCity.Remove("https://www.gasbuddy.com/GasPrices");
             }
+            listHrefCity = listHrefCity.Except(ListMain).ToList();
             List<string> ListStation = GetMajorAndCountryLink(listHrefCity);
             listUrl.AddRange(ListStation);
             #endregion
@@ -496,86 +501,88 @@ namespace SchedulerGasTips
             NameAndProp data = new NameAndProp();
             string JsonString = string.Empty;
             HtmlWeb hwJson = new HtmlWeb();
+            this.InternalWriteLog("Loading Gas Station : " + link);
 
             HtmlAgilityPack.HtmlDocument docJson = hwJson.Load(link);//"https://www.gasbuddy.com/Station/16108");
-            foreach (HtmlNode script in docJson.DocumentNode.Descendants("script").ToArray())
+            HtmlNode script = docJson.DocumentNode.Descendants().Where(n => n.Name == "script" && n.InnerHtml.Contains("PreloadedState")).FirstOrDefault();//.ToList().ForEach(n => n.Remove());
+
+            if (script != null)
             {
-                if (script.InnerHtml.Contains("PreloadedState"))
+                JsonString = script.InnerText;
+                JsonString = JsonString.Remove(0, 24);
+                JsonString = JsonString.Remove(JsonString.Length - 1);
+
+                #region Set Station info
+                XmlDocument xmlDoc = (XmlDocument)JsonConvert.DeserializeXmlNode(JsonString, "root");
+                XmlNodeList nodeListInfo = xmlDoc.DocumentElement.SelectNodes("/root/stationInfo");
+                foreach (XmlNode node in nodeListInfo)
                 {
-                    JsonString = script.InnerText;
+                    XmlElement element = (XmlElement)node;
+                    data.Name = element.GetElementsByTagName("name")[0].ChildNodes[0].InnerText;
+                    data.Brand_id = Convert.ToInt32(element.GetElementsByTagName("brand_id")[0].ChildNodes[0].InnerText);
+                    data.Address = element.GetElementsByTagName("address")[0].ChildNodes[0].InnerText;
+                    data.Phone = element.GetElementsByTagName("phone")[0].ChildNodes[0].InnerText;
+                    data.Latitude = element.GetElementsByTagName("latitude")[0].ChildNodes[0].InnerText;
+                    data.Longitude = element.GetElementsByTagName("longitude")[0].ChildNodes[0].InnerText;
+                    data.Country = element.GetElementsByTagName("address")[0].ChildNodes[4].InnerText;
+                    data.Locality = element.GetElementsByTagName("address")[0].ChildNodes[2].InnerText;
+                    data.Region = element.GetElementsByTagName("address")[0].ChildNodes[2].InnerText;
+                    data.Postal_code = element.GetElementsByTagName("address")[0].ChildNodes[5].InnerText;
                 }
+                #endregion
 
-            }
-            JsonString = JsonString.Remove(0, 24);
-            JsonString = JsonString.Remove(JsonString.Length - 1);
-
-            #region Set Station info
-            XmlDocument xmlDoc = (XmlDocument)JsonConvert.DeserializeXmlNode(JsonString, "root");
-            XmlNodeList nodeListInfo = xmlDoc.DocumentElement.SelectNodes("/root/stationInfo");
-            foreach (XmlNode node in nodeListInfo)
-            {
-                XmlElement element = (XmlElement)node;
-                data.Name = element.GetElementsByTagName("name")[0].ChildNodes[0].InnerText;
-                data.Brand_id = Convert.ToInt32(element.GetElementsByTagName("brand_id")[0].ChildNodes[0].InnerText);
-                data.Address = element.GetElementsByTagName("address")[0].ChildNodes[0].InnerText;
-                data.Phone = element.GetElementsByTagName("phone")[0].ChildNodes[0].InnerText;
-                data.Latitude = element.GetElementsByTagName("latitude")[0].ChildNodes[0].InnerText;
-                data.Longitude = element.GetElementsByTagName("longitude")[0].ChildNodes[0].InnerText;
-                data.Country = element.GetElementsByTagName("address")[0].ChildNodes[4].InnerText;
-                data.Locality = element.GetElementsByTagName("address")[0].ChildNodes[2].InnerText;
-                data.Region = element.GetElementsByTagName("address")[0].ChildNodes[2].InnerText;
-                data.Postal_code = element.GetElementsByTagName("address")[0].ChildNodes[5].InnerText;
-            }
-            #endregion
-
-            #region Set Price
-            XmlNodeList nodeListPrice = xmlDoc.DocumentElement.SelectNodes("/root/fuels");
-            foreach (XmlNode priceNode in nodeListPrice)
-            {
-                XmlElement element = (XmlElement)priceNode;
-                for (int i = 0; i < element.GetElementsByTagName("fuelsByStationId")[0].ChildNodes.Count; i++)
+                #region Set Price
+                XmlNodeList nodeListPrice = xmlDoc.DocumentElement.SelectNodes("/root/fuels");
+                foreach (XmlNode priceNode in nodeListPrice)
                 {
-                    switch (element.GetElementsByTagName("fuelType")[i].ChildNodes[0].InnerText.ToLower())
+                    XmlElement element = (XmlElement)priceNode;
+                    for (int i = 0; i < element.GetElementsByTagName("fuelsByStationId")[0].ChildNodes.Count; i++)
                     {
-                        //convert from dollar to cent
-                        case "regular":
-                            data.Regular_price = Convert.ToDecimal(element.GetElementsByTagName("prices")[i].ChildNodes[1].InnerText.ToString().Replace('.', ',')) * 100;
-                            break;
-                        case "premium":
-                            data.Premium_price = Convert.ToDecimal(element.GetElementsByTagName("prices")[i].ChildNodes[1].InnerText.ToString().Replace('.', ',')) * 100;
-                            break;
-                        case "midgrade":
-                            data.Midgrade_price = Convert.ToDecimal(element.GetElementsByTagName("prices")[i].ChildNodes[1].InnerText.ToString().Replace('.', ',')) * 100;
-                            break;
-                        case "diesel":
-                            data.Diesel_price = Convert.ToDecimal(element.GetElementsByTagName("prices")[i].ChildNodes[1].InnerText.ToString().Replace('.', ',')) * 100;
-                            break;
-                        default:
-                            break;
+                        switch (element.GetElementsByTagName("fuelType")[i].ChildNodes[0].InnerText.ToLower())
+                        {
+                            //convert from dollar to cent
+                            case "regular":
+                                data.Regular_price = Convert.ToDecimal(element.GetElementsByTagName("prices")[i].ChildNodes[1].InnerText.ToString().Replace('.', ',')) * 100;
+                                break;
+                            case "premium":
+                                data.Premium_price = Convert.ToDecimal(element.GetElementsByTagName("prices")[i].ChildNodes[1].InnerText.ToString().Replace('.', ',')) * 100;
+                                break;
+                            case "midgrade":
+                                data.Midgrade_price = Convert.ToDecimal(element.GetElementsByTagName("prices")[i].ChildNodes[1].InnerText.ToString().Replace('.', ',')) * 100;
+                                break;
+                            case "diesel":
+                                data.Diesel_price = Convert.ToDecimal(element.GetElementsByTagName("prices")[i].ChildNodes[1].InnerText.ToString().Replace('.', ',')) * 100;
+                                break;
+                            default:
+                                break;
+                        }
                     }
                 }
-            }
-            #endregion
+                #endregion
 
-            #region Set Features
-            XmlNodeList nodeListFeatures = xmlDoc.DocumentElement.SelectNodes("/root/features");
-            foreach (XmlNode featureNode in nodeListFeatures)
-            {
-                XmlElement element = (XmlElement)featureNode;
-                for (int i = 0; i < element.GetElementsByTagName("byStationId")[0].ChildNodes.Count; i++)
+                #region Set Features
+                XmlNodeList nodeListFeatures = xmlDoc.DocumentElement.SelectNodes("/root/features");
+                foreach (XmlNode featureNode in nodeListFeatures)
                 {
-                    if (i == element.GetElementsByTagName("byStationId")[0].ChildNodes.Count - 1)
+                    XmlElement element = (XmlElement)featureNode;
+                    for (int i = 0; i < element.GetElementsByTagName("byStationId")[0].ChildNodes.Count; i++)
                     {
-                        data.Features += element.GetElementsByTagName("displayName")[i].ChildNodes[0].InnerText.ToString();
-                    }
-                    else
-                    {
-                        data.Features += element.GetElementsByTagName("displayName")[i].ChildNodes[0].InnerText.ToString() + ", ";
+                        if (i == element.GetElementsByTagName("byStationId")[0].ChildNodes.Count - 1)
+                        {
+                            data.Features += element.GetElementsByTagName("displayName")[i].ChildNodes[0].InnerText.ToString();
+                        }
+                        else
+                        {
+                            data.Features += element.GetElementsByTagName("displayName")[i].ChildNodes[0].InnerText.ToString() + ", ";
+                        }
                     }
                 }
+                #endregion
+
+                data.Url = link;
+                response.Add(data);
             }
-            #endregion
-            response.Add(data);
+            this.InternalWriteLog("Done Gas Station : " + link);
             return response;
         }
 
@@ -584,8 +591,11 @@ namespace SchedulerGasTips
             this.InternalWriteLog("Begin crawling process...");
             List<NameAndProp> ListData = new List<NameAndProp>();
             NameAndProp data = new NameAndProp();
-            //List<string> a = new List<string>();
-            List<string> listUrl = GetAllState();//GetAllState(); GetMajorAndCountryLink(a);
+
+            List<string> listUrl = new List<string>(); //GetAllState();
+            listUrl.Add("https://www.gasbuddy.com/Station/118935");
+            listUrl.Add("https://www.gasbuddy.com/Station/190647");
+            listUrl.Add("https://www.gasbuddy.com/Station/10585");
             foreach (var item in listUrl)
             {
                 ListData.AddRange(GetLowestPrices(item));
